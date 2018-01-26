@@ -1,5 +1,4 @@
 int sensorPin = A1;
-int ledPin = 4;
 int sensorValue = 0;
 int outputValue = 0;
 
@@ -11,21 +10,13 @@ int outputValue = 0;
 
 void setup() {
   // put your setup code here, to run once:
-  pinMode(ledPin, OUTPUT);
   Serial.begin(9600);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   sensorValue = analogRead(sensorPin);
-  outputValue = map(sensorValue, 0, 1023, 100, 800);
-  if (sensorValue > 100) {
-    if (sensorValue < 300) {
-      digitalWrite(ledPin, HIGH);
-    }
-  } else {
-    digitalWrite(ledPin, LOW); 
-  }
+  outputValue = 30431 * pow(sensorValue, -1.169); // centimeters
   
   Serial.println(outputValue);
 }
