@@ -42,9 +42,11 @@ int numDist;
 
 // Regarding BLE/Serial
 String msgSer;
+bool BLEOn;
 
 // Regarding the SD card
 QueueList<String> queue;
+String msgData;
 String msgSD;
 #ifdef _SD_
   String filename;
@@ -88,8 +90,8 @@ time_t requestSync()
 #ifdef _SD_
   // SD functions
   void SDInit() {
-    bool complete = SD.begin(chipSelect);
-    delay(50);
+    bool complete = SD.begin();
+    delay(100);
     if (!complete) {
       #ifdef _DEBUG_
         Serial.println("SD Initialization Failed!");
@@ -122,15 +124,26 @@ time_t requestSync()
   
     filename = DeviceID;
     filename += "_";
-    filename = DeviceLoc;
+    filename += DeviceLoc;
     filename += "_";
-    filename = DeviceDir;
+    filename += DeviceDir;
     filename += "_";
-    filename += now(); 
+    filename += String(int(now())); 
     filename += ".txt";
+
+    #ifdef _DEBUG_
+      Serial.println(filename);
+    #endif
+
     char temp[filename.length()+1];
     filename.toCharArray(temp, sizeof(temp));
     saveFile = SD.open(temp, FILE_WRITE);
+    if (!SD.exists(temp)) {
+        #ifdef _DEBUG_
+          Serial.println("Error opening SD data file");
+        #endif
+        saveFile.close();
+    }
   }
   
   void swapFiles() {
@@ -141,7 +154,7 @@ time_t requestSync()
     filename += "_";
     filename = DeviceDir;
     filename += "_";
-    filename += now(); 
+    filename += String(int(now())); 
     filename += ".txt";
     char temp[filename.length()+1];
     filename.toCharArray(temp, sizeof(temp));
@@ -167,8 +180,8 @@ void setParamsCommands() {
       Serial.println(msgSer);
     #endif
 
-    msgSer.remove(0, 2);
-    DeviceID = msgSer;
+    msgSer.remove(0, 3);
+    DeviceID = msgSer.trim();
   }
   else if (msgSer.indexOf("LOC=") > -1) {
     #ifdef _DEBUG_
@@ -176,8 +189,8 @@ void setParamsCommands() {
       Serial.println(msgSer);
     #endif
 
-    msgSer.remove(0, 3);
-    DeviceLoc = msgSer;
+    msgSer.remove(0, 4);
+    DeviceLoc = msgSer.trim();
   }
   else if (msgSer.indexOf("DIR=") > -1) {
     #ifdef _DEBUG_
@@ -185,8 +198,8 @@ void setParamsCommands() {
       Serial.println(msgSer);
     #endif
 
-    msgSer.remove(0, 3);
-    DeviceDir = msgSer;
+    msgSer.remove(0, 4);
+    DeviceDir = msgSer.trim();
   }
   else if (msgSer.indexOf("COMMENT=") > -1) {
     #ifdef _DEBUG_
@@ -194,8 +207,8 @@ void setParamsCommands() {
       Serial.println(msgSer);
     #endif
 
-    msgSer.remove(0, 7);
-    DevComment = msgSer;
+    msgSer.remove(0, 8);
+    DevComment = msgSer.trim();
   }
   msgSer = "";
 }
@@ -218,14 +231,44 @@ void rmFiles(File dir) {
     entry.close();
   }
 }
+
+void dumpFiles(File dir, bool BLEOn) {
+  while (true) {
+    File entry =  dir.openNextFile();
+    if (! entry) {
+      break;
+    }
+    if (entry.isDirectory()) {
+      dumpFiles(entry, BLEOn);
+    } else {
+      String temp = "BEGIN_FILE="+String(entry.name());
+      if (BLEOn) {
+        BTSerial.println(temp);
+        while (entry.available()) {
+          BTSerial.write(entry.read());
+        }
+        BTSerial.println("END_FILE");
+      } else {
+        Serial.println(temp);
+        while (entry.available()) {
+          Serial.write(entry.read());
+        }
+        Serial.println("END_FILE");        
+      }
+      entry.close();
+    }
+  }
+}
 #endif
 
 void runCommands() {
   if (Serial.available() > 0) {
     msgSer = Serial.readString();
+    BLEOn = false;
   }
   if (BTSerial.available() > 0) {
     msgSer = BTSerial.readString();
+    BLEOn = true;
   }
 
   if (msgSer.indexOf("START_RUNNING") > -1) {
@@ -242,6 +285,9 @@ void runCommands() {
     #ifdef _SD_
     if (saveFile) {
       saveFile.close();
+      #ifdef _DEBUG_
+        Serial.println("Closed save file.");
+      #endif
     }
     #endif
     active_toggle = false;
@@ -250,7 +296,20 @@ void runCommands() {
       Serial.print(">>Received command: ");
       Serial.println(msgSer);
     #endif
-    // NEED TO WRITE FUNCTION
+    #ifdef _SD_
+      if (BLEOn) {
+        BTSerial.println("BEGIN_TRANSFER");
+      } else {
+        Serial.println("BEGIN_TRANSFER");
+      }
+      root = SD.open("/");
+      dumpFiles(root, BLEOn);
+      if (BLEOn) {
+        BTSerial.println("END_TRANSFER");
+      } else {
+        Serial.println("END_TRANSFER");
+      }
+    #endif
   } else if (msgSer.indexOf("RESET_DEVICE") > -1) {
     #ifdef _DEBUG_
       Serial.print(">>Received command: ");
@@ -316,7 +375,7 @@ void setup() {
     }
   #endif
 
-  while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "") {
+  while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
     if (Serial.available() || BTSerial.available()) {
       setParamsCommands();
     }
@@ -339,7 +398,8 @@ void loop() {
   // Check if we received command to start running
   if (active_toggle) {
     distance = Dist.getDistanceCentimeter();
-    Serial.println(String(distance));
+    distance += 10;
+    //Serial.println(String(distance));
   
     // Valid distances are 10 cm to 40 cm
     if (distance > 10) {
@@ -348,8 +408,8 @@ void loop() {
         if (timer0up == false) {
           timer0up = true;
           timer0 = 0;
-          msgSD = now();
-          msgSD += ", ";
+          msgData = String(int(now()));
+          msgData += ", ";
           avgDist = distance;
           numDist = 1;
         } else {
@@ -365,18 +425,22 @@ void loop() {
       if (timer0up == true) {
         // Was the length of time valid (more than 100 ms)?
         if (timer0 > 100) {
-          msgSD += timer0;
-          msgSD += ", ";
+          msgData += timer0;
+          msgData += ", ";
           avgDist = (avgDist + lastDist) / (numDist / 10 + 1);
-          msgSD += avgDist;
-          queue.push(msgSD);
+          msgData += avgDist;
+          queue.push(msgData);
           }
           timer0up = false; 
       } else {
         // Take the opportunity to write to SD
         if (!queue.isEmpty()) {
           if (saveFile) {
-            saveFile.println(queue.pop());
+            msgSD = queue.pop();
+            #ifdef _DEBUG_
+              Serial.println(msgSD);
+            #endif
+            saveFile.println(msgSD);
 
             #ifdef _SD_
               // Check if the file is greater than 1 MB
@@ -387,7 +451,7 @@ void loop() {
           } else {
             // If the file didn't open, print an error
             #ifdef _DEBUG_
-              Serial.println(queue.pop());
+              Serial.println("No save file to write to!");
             #endif
           }
         } else {
