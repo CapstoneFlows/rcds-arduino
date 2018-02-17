@@ -60,25 +60,30 @@ int sensorPin = A1;
 #endif
 
 /*-------------------------------------------------------------------------*/
-// Time and SD helper functions
+// Helper and time functions
+
+// Serial printer
+void serPrint(String str) {
+  (BLEOn) ? BTSerial.println(str) : Serial.println(str);
+}
 
 // Serial sync
 void processSyncMessage() {
   unsigned long pctime;
-  const unsigned long DEFAULT_TIME = 1357041600; // Jan 1 2013
+  const unsigned long DEFAULT_TIME = 1518739200; // Feb 16 2018
 
   if(Serial.find(TIME_HEADER)) {
      pctime = Serial.parseInt();
-     if( pctime >= DEFAULT_TIME) { // check the integer is a valid time (greater than Jan 1 2013)
-       setTime(pctime); // Sync Arduino clock to the time received on the serial port
+     if( pctime >= DEFAULT_TIME) { // Check that it's a valid time greater than default
+       setTime(pctime); // Sync Arduino clock
      }
      Serial.println("\n");
      Serial.println("TIME_ACK");
      BLEOn = false;
   } else if(BTSerial.find(TIME_HEADER)) {
      pctime = BTSerial.parseInt();
-     if( pctime >= DEFAULT_TIME) { // check the integer is a valid time (greater than Jan 1 2013)
-       setTime(pctime); // Sync Arduino clock to the time received on the serial port
+     if( pctime >= DEFAULT_TIME) { // Check that it's a valid time greater than default
+       setTime(pctime); // Sync Arduino clock
      }
      BTSerial.println("\n");
      BTSerial.println("TIME_ACK");
@@ -86,33 +91,35 @@ void processSyncMessage() {
   }
 }
 
+// Send time request symbol (BEL, ASCII 7)
 time_t requestSync()
 {
   Serial.write(TIME_REQUEST);
-  BTSerial.write(TIME_REQUEST);  
-  return 0; // the time will be sent later in response to serial mesg
+  BTSerial.write(TIME_REQUEST);
+  return 0;
 }
 
+/*-------------------------------------------------------------------------*/
+// SD functions
+
 #ifdef _SD_
-  // SD functions
+
+  // Function to start up SD card
   void SDInit() {
     bool complete = SD.begin();
-    delay(100);
+    delay(100);   // Needs time to start up before checking that it completed
     if (!complete) {
-      #ifdef _DEBUG_
-        Serial.println("SD Initialization Failed!");
-      #endif
-      (BLEOn) ? BTSerial.println("SD_INIT_ERROR") : Serial.println("SD_INIT_ERROR");
+      serPrint("SD_INIT_ERROR");
       exit(-1);
     }
     #ifdef _DEBUG_
-      Serial.println("SD Initialization Done.");
+      Serial.println(">>SD Initialization Done.");
     #endif
   }
 
+  // Save system variables to file if not saved
   void SDVarInit(bool SDDevVarsSaved) {
     if (!SDDevVarsSaved) {
-      // Save device variables if not saved
       char ID_FileName[] = "Device_Information.txt";
       if (!SD.exists(ID_FileName)) {
         bool success = idFile.open(ID_FileName, O_WRITE | O_CREAT);
@@ -123,20 +130,18 @@ time_t requestSync()
           idFile.println(DevComment);
           idFile.close();
           #ifdef _DEBUG_
-            Serial.println("Saved device variables to file successfully.");
+            Serial.println(">>Saved device variables to file successfully.");
           #endif
         } else {
-          #ifdef _DEBUG_
-            Serial.println("Error opening SD ID file");
-          #endif
           idFile.close();
-          (BLEOn) ? BTSerial.println("SD_VAR_ERROR") : Serial.println("SD_VAR_ERROR");
+          serPrint("SD_VAR_ERROR");
           exit(-1);
         }
       }
     }
   }
 
+  // Initialize data file to write to
   void SDFileInit() {
     filename = String(int(now())); 
     filename += ".csv";
@@ -146,18 +151,19 @@ time_t requestSync()
     saveFile.open(temp, O_WRITE | O_CREAT);
     if (!saveFile.isOpen()) {
         #ifdef _DEBUG_
-          Serial.println("Error opening SD data file: "+filename);
+          Serial.println(">>Error opening SD data file: "+filename);
         #endif
         saveFile.close();
-        (BLEOn) ? BTSerial.println("SD_FILE_ERROR") : Serial.println("SD_FILE_ERROR");
+        serPrint("SD_FILE_ERROR");
         exit(-1);
     } else {
         #ifdef _DEBUG_
-          Serial.println("Opened data file successfully.");
+          Serial.println(">>Opened data file successfully.");
         #endif
     }
   }
-  
+
+  // Swap data files when one gets too big
   void swapFiles() {
     saveFile.close();
     filename = String(int(now())); 
@@ -166,24 +172,76 @@ time_t requestSync()
     filename.toCharArray(temp, sizeof(temp));
     saveFile.open(temp, O_WRITE | O_CREAT);
     if (saveFile.isOpen()) {
-        #ifdef _DEBUG_
-          Serial.println("Error swapping SD data file");
-        #endif
-        (BLEOn) ? BTSerial.println("SD_SWAP_ERROR") : Serial.println("SD_SWAP_ERROR");
+        serPrint("SD_SWAP_ERROR");
         saveFile.close();
         active_toggle = false;
     } else {
         #ifdef _DEBUG_
-          Serial.println("Swapped data file successfully.");
+          Serial.println(">>Swapped data file successfully.");
         #endif
     }
   }
+
+  // Wipe the SD card and remove all files
+  void rmFiles() {
+    if(BLEOn) {
+      if (!SD.wipe(&BTSerial)) {
+        SD.errorHalt("Wipe failed.");
+        BTSerial.println("SD_RESET_ERROR");
+      }
+      if (!SD.begin()) {
+        SD.errorHalt("Second init after reset failed.");
+        BTSerial.println("SD_REINIT_ERROR");
+      }
+      BTSerial.println("RESET_COMPLETE");
+    } else {
+      if (!SD.wipe(&Serial)) {
+        SD.errorHalt("Wipe failed.");
+        Serial.println("SD_RESET_ERROR");
+      }
+      if (!SD.begin()) {
+        SD.errorHalt("Second init after reset failed.");
+        Serial.println("SD_REINIT_ERROR");
+      }
+      Serial.println("RESET_COMPLETE");
+    }
+  }
+
+  // Return the filename and contents of all files on the SD card
+  void dumpFiles(SdFile dir) {
+    SdFile entry;
+    while (entry.openNext(SD.vwd(), O_READ)) {
+      if (entry.isDir()) {
+        dumpFiles(entry);
+      } else {
+        if (BLEOn) {
+          BTSerial.print("BEGIN_FILE=");
+          entry.printName(&BTSerial);
+          BTSerial.print('\n');
+          while (entry.available()) {
+            BTSerial.write(entry.read());
+          }
+          BTSerial.println("END_FILE");
+        } else {
+          Serial.print("BEGIN_FILE=");
+          entry.printName(&Serial);
+          Serial.print('\n');
+          while (entry.available()) {
+            Serial.write(entry.read());
+          }
+          Serial.println("END_FILE");        
+        }
+        entry.close();
+      }
+    }
+  }
+  
 #endif
 
 /*-------------------------------------------------------------------------*/
 // Communication and control helper functions
 
-// BLE connection
+// Receive commands to set system variables
 void setParamsCommands() {
   if (Serial.available() > 0) {
     msgSer = Serial.readString();
@@ -202,7 +260,7 @@ void setParamsCommands() {
 
     msgSer.remove(0, 3);
     DeviceID = msgSer.trim();
-    (BLEOn) ? BTSerial.println("ID_ACK") : Serial.println("ID_ACK");
+    serPrint("ID_ACK");
   }
   else if (msgSer.indexOf("LOC=") > -1) {
     #ifdef _DEBUG_
@@ -212,7 +270,7 @@ void setParamsCommands() {
 
     msgSer.remove(0, 4);
     DeviceLoc = msgSer.trim();
-    (BLEOn) ? BTSerial.println("LOC_ACK") : Serial.println("LOC_ACK");
+    serPrint("LOC_ACK");
   }
   else if (msgSer.indexOf("DIR=") > -1) {
     #ifdef _DEBUG_
@@ -222,7 +280,7 @@ void setParamsCommands() {
 
     msgSer.remove(0, 4);
     DeviceDir = msgSer.trim();
-    (BLEOn) ? BTSerial.println("DIR_ACK") : Serial.println("DIR_ACK");
+    serPrint("DIR_ACK");
   }
   else if (msgSer.indexOf("COMMENT=") > -1) {
     #ifdef _DEBUG_
@@ -232,65 +290,12 @@ void setParamsCommands() {
 
     msgSer.remove(0, 8);
     DevComment = msgSer.trim();
-    (BLEOn) ? BTSerial.println("COMMENT_ACK") : Serial.println("COMMENT_ACK");
+    serPrint("COMMENT_ACK");
   }
   msgSer = "";
 }
 
-#ifdef _SD_
-void rmFiles() {
-  if(BLEOn) {
-    if (!SD.wipe(&BTSerial)) {
-      SD.errorHalt("Wipe failed.");
-      BTSerial.println("SD_RESET_ERROR");
-    }
-    if (!SD.begin()) {
-      SD.errorHalt("Second init after reset failed.");
-      BTSerial.println("SD_REINIT_ERROR");
-    }
-    BTSerial.println("RESET_COMPLETE");
-  } else {
-    if (!SD.wipe(&Serial)) {
-      SD.errorHalt("Wipe failed.");
-      Serial.println("SD_RESET_ERROR");
-    }
-    if (!SD.begin()) {
-      SD.errorHalt("Second init after reset failed.");
-      Serial.println("SD_REINIT_ERROR");
-    }
-    Serial.println("RESET_COMPLETE");
-  }
-}
-
-void dumpFiles(SdFile dir) {
-  SdFile entry;
-  while (entry.openNext(SD.vwd(), O_READ)) {
-    if (entry.isDir()) {
-      dumpFiles(entry);
-    } else {
-      if (BLEOn) {
-        BTSerial.print("BEGIN_FILE=");
-        entry.printName(&BTSerial);
-        BTSerial.print('\n');
-        while (entry.available()) {
-          BTSerial.write(entry.read());
-        }
-        BTSerial.println("END_FILE");
-      } else {
-        Serial.print("BEGIN_FILE=");
-        entry.printName(&Serial);
-        Serial.print('\n');
-        while (entry.available()) {
-          Serial.write(entry.read());
-        }
-        Serial.println("END_FILE");        
-      }
-      entry.close();
-    }
-  }
-}
-#endif
-
+// Receive commands to control state and workflow
 void runCommands() {
   if (Serial.available() > 0) {
     msgSer = Serial.readString();
@@ -312,7 +317,7 @@ void runCommands() {
       }
     #endif
     active_toggle = true;
-    (BLEOn) ? BTSerial.println("START_ACK") : Serial.println("START_ACK");
+    serPrint("START_ACK");
   } else if (msgSer.indexOf("STOP_RUNNING") > -1) {
     #ifdef _DEBUG_
       Serial.print(">>Received command: ");
@@ -322,22 +327,22 @@ void runCommands() {
     if (saveFile.isOpen()) {
       saveFile.close();
       #ifdef _DEBUG_
-        Serial.println("Closed save file.");
+        Serial.println(">>Closed save file.");
       #endif
     }
     #endif
     active_toggle = false;
-    (BLEOn) ? BTSerial.println("STOP_ACK") : Serial.println("STOP_ACK");
+    serPrint("STOP_ACK");
   } else if (msgSer.indexOf("RETURN_DATA") > -1) {
     if (active_toggle) {
-      (BLEOn) ? BTSerial.println("RETURN_ACK") : Serial.println("RETURN_ACK");
-      (BLEOn) ? BTSerial.println("NOT_STOPPED") : Serial.println("NOT_STOPPED");
+      serPrint("RETURN_ACK");
+      serPrint("NOT_STOPPED");
     } else {
       #ifdef _DEBUG_
         Serial.print(">>Received command: ");
         Serial.println(msgSer);
       #endif
-      (BLEOn) ? BTSerial.println("RETURN_ACK") : Serial.println("RETURN_ACK");
+      serPrint("RETURN_ACK");
       #ifdef _SD_
         if (BLEOn) {
           BTSerial.println("BEGIN_TRANSFER");
@@ -356,23 +361,20 @@ void runCommands() {
     }
   } else if (msgSer.indexOf("RESET_DEVICE") > -1) {
     if (active_toggle) {
-      (BLEOn) ? BTSerial.println("RESET_ACK") : Serial.println("RESET_ACK");
-      (BLEOn) ? BTSerial.println("NOT_STOPPED") : Serial.println("NOT_STOPPED");
+      serPrint("RESET_ACK");
+      serPrint("NOT_STOPPED");
     } else {
       #ifdef _DEBUG_
         Serial.print(">>Received command: ");
         Serial.println(msgSer);
       #endif
-      (BLEOn) ? BTSerial.println("RESET_ACK") : Serial.println("RESET_ACK");
+      serPrint("RESET_ACK");
       #ifdef _SD_
         rmFiles();
-        #ifdef _DEBUG_
-          Serial.print("Reset device successfully.");
-        #endif
       #endif
       
       DeviceID = DeviceLoc = DeviceDir = DevComment = "";
-      (BLEOn) ? BTSerial.println("NEED_VARS") : Serial.println("NEED_VARS");
+      serPrint("NEED_VARS");
       
       while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
         if (Serial.available() || BTSerial.available()) {
@@ -381,7 +383,7 @@ void runCommands() {
       }
     
       #ifdef _DEBUG_
-        Serial.println("Parameters set.");
+        Serial.println(">>Parameters set.");
       #endif
       
       #ifdef _SD_
@@ -389,12 +391,11 @@ void runCommands() {
         SDFileInit();
       #endif
       
-      (BLEOn) ? BTSerial.println("READY") : Serial.println("READY");
+      serPrint("READY");
     }
   }
   msgSer = "";
 }
-
 
 /*-------------------------------------------------------------------------*/
 // Main setup
@@ -403,7 +404,8 @@ void setup() {
   Serial.begin(9600);
   BTSerial.begin(9600);
   Dist.begin(sensorPin);
-  
+
+  // Initialize SD card and check for device variables
   #ifdef _SD_
     // Start up SD card
     SDInit();
@@ -443,19 +445,21 @@ void setup() {
         idFile.close();
         SDDevVarsSaved = true;
         #ifdef _DEBUG_
-          Serial.println("Successfully restored device variables.");
+          Serial.println(">>Successfully restored device variables.");
         #endif
       } else {
         #ifdef _DEBUG_
-          Serial.println("Error opening SD ID file, will ask for new variables.");
+          Serial.println(">>Error opening SD ID file, will ask for new variables.");
         #endif
         idFile.close();
       }
     }
   #endif
 
-  setSyncProvider(requestSync);  // Set function to call when sync required
+  // Set function to call when sync required
+  setSyncProvider(requestSync);
   while (timeStatus() == timeNotSet) {
+    delay(1000);
     requestSync();
     if (Serial.available() || BTSerial.available()) {
       processSyncMessage();
@@ -465,7 +469,7 @@ void setup() {
   timer0 = 0;
   
   #ifdef _DEBUG_
-    Serial.println("\nTime synchronized.");
+    Serial.println("\n>>Time synchronized.");
   #endif
 
   if (!SDDevVarsSaved) {
@@ -473,9 +477,10 @@ void setup() {
     DeviceLoc = "";
     DeviceDir = "";
     DevComment = "";
-    (BLEOn) ? BTSerial.println("NEED_VARS") : Serial.println("NEED_VARS");
+    serPrint("NEED_VARS");
   }
 
+  // Set device variables
   while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
     if (Serial.available() || BTSerial.available()) {
       setParamsCommands();
@@ -483,15 +488,16 @@ void setup() {
   }
 
   #ifdef _DEBUG_
-    Serial.println("Parameters set.");
+    Serial.println(">>Parameters set.");
   #endif
-  
+
+  // Initialize SD files
   #ifdef _SD_
     SDVarInit(SDDevVarsSaved);
     SDFileInit();
   #endif
 
-  (BLEOn) ? BTSerial.println("READY") : Serial.println("READY");
+  serPrint("READY");
 }
 
 
@@ -503,7 +509,10 @@ void loop() {
   if (active_toggle) {
     distance = Dist.getDistanceCentimeter();
     distance += 10;
-    //Serial.println(String(distance));
+    #ifdef _DEBUG_
+      Serial.print("Distance read: ");
+      Serial.println(String(distance));
+    #endif
   
     // Valid distances are 10 cm to 40 cm
     if (distance > 10 && distance < 40) {
@@ -535,32 +544,38 @@ void loop() {
           }
           timer0up = false; 
       } else {
-        // Take the opportunity to write to SD
-        if (!queue.isEmpty()) {
-          if (saveFile.isOpen()) {
-            msgSD = queue.pop();
-            #ifdef _DEBUG_
-              Serial.println(msgSD);
-            #endif
-            saveFile.println(msgSD);
-
-            #ifdef _SD_
+        #ifdef _SD_
+          // Not collecting data, take the opportunity to write some to SD
+          if (!queue.isEmpty()) {
+            if (saveFile.isOpen()) {
+              msgSD = queue.pop();
+              #ifdef _DEBUG_
+                Serial.println(msgSD);
+              #endif
+              saveFile.println(msgSD);
+  
               // Check if the file is greater than 1 MB
               if (saveFile.fileSize() > 1048576) {
                 swapFiles();
               }
-            #endif
+            } else {
+              // If the file didn't open, print an error
+              #ifdef _DEBUG_
+                Serial.println(">>No save file to write to!");
+              #endif
+              serPrint("SD_WRITE_ERROR");
+            }
           } else {
-            // If the file didn't open, print an error
-            #ifdef _DEBUG_
-              Serial.println("No save file to write to!");
-            #endif
-            (BLEOn) ? BTSerial.println("SD_WRITE_ERROR") : Serial.println("SD_WRITE_ERROR");
+            // Now it's safe to check to stop running
+            runCommands();
           }
-        } else {
-          // Now it's safe to check to stop running
-          runCommands();
-        }
+        #endif
+        
+        #ifndef _SD_
+          #ifdef _DEBUG_
+            Serial.println(msgSD);
+          #endif
+        #endif
       }
     }
   } else {
