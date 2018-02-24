@@ -30,6 +30,7 @@ String DeviceDir;
 String DevComment;
 
 // Timer
+elapsedMillis timeSync0;
 elapsedMillis timer0;
 bool timer0up;
 bool active_toggle;
@@ -456,11 +457,14 @@ void setup() {
     }
   #endif
 
+  timeSync0 = 0;
+
   // Set function to call when sync required
   setSyncProvider(requestSync);
   while (timeStatus() == timeNotSet) {
-    delay(1000);
-    requestSync();
+    if (timeSync0 % 1000 == 0) {
+      requestSync();
+    }
     if (Serial.available() || BTSerial.available()) {
       processSyncMessage();
     }
