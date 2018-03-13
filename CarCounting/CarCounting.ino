@@ -16,7 +16,8 @@
 /*-------------------------------------------------------------------------*/
 // Variable declaration and definition
 
-DistanceGP2Y0A21YK Dist;
+DistanceGP2Y0A21YK Dist0;
+DistanceGP2Y0A21YK Dist1;
 SoftwareSerial BTSerial(7, 8);  // SET PINS APPROPRIATELY
 SdFat SD;
 SdFile saveFile;
@@ -32,14 +33,19 @@ String DevComment;
 // Timer
 elapsedMillis timeSync0;
 elapsedMillis timer0;
+elapsedMillis timerDelta0;
 bool timer0up;
+bool timerDelta0up;
 bool active_toggle;
 
 // Regarding the sensor
-int distance;
+int firstSensor;
+int distance0;
+int distance1;
 int lastDist;
 int avgDist;
 int numDist;
+int tDelta;
 
 // Regarding BLE/Serial
 String msgSer;
@@ -54,7 +60,8 @@ String msgSD;
 #endif
 
 // SET PINS APPROPRIATELY
-int sensorPin = A1;
+int sensorPin0 = A1;
+int sensorPin1 = A2;
 #ifdef _SD_
   const int chipSelect = 10;
   const int cardDetect = 6;
@@ -404,7 +411,8 @@ void runCommands() {
 void setup() {
   Serial.begin(9600);
   BTSerial.begin(9600);
-  Dist.begin(sensorPin);
+  Dist0.begin(sensorPin0);
+  Dist1.begin(sensorPin1);
 
   // Initialize SD card and check for device variables
   #ifdef _SD_
@@ -470,7 +478,10 @@ void setup() {
     }
   }
   timer0up = false;
+  timerDelta0up = false;
   timer0 = 0;
+  timerDelta0 = 0;
+  firstSensor = -1;
   
   #ifdef _DEBUG_
     Serial.println("\n>>Time synchronized.");
@@ -511,25 +522,65 @@ void setup() {
 void loop() {
   // Check if we received command to start running
   if (active_toggle) {
-    distance = Dist.getDistanceCentimeter();
-    distance += 10;
+    distance0 = Dist0.getDistanceCentimeter();
+    distance1 = Dist1.getDistanceCentimeter();
+    distance0 += 10;
+    distance1 += 10;
     #ifdef _DEBUG_
       Serial.print("Distance read: ");
-      Serial.println(String(distance));
+      Serial.println(String(distance0));
+      Serial.println(String(distance1));
     #endif
   
     // Valid distances are 10 cm to 40 cm
-    if (distance > 10 && distance < 40) {
-      // Are we already counting time?
+    if (distance0 > 10 && distance0 < 40 && firstSensor != 1) {
+      // Are we already counting time on first sensor?
       if (timer0up == false) {
+        firstSensor = 0;
         timer0up = true;
         timer0 = 0;
+        timerDelta0up = true;
+        timerDelta0 = 0;
+        tDelta = -1;
         msgData = String(int(now()));
         msgData += ", ";
-        avgDist = distance;
+        msgData += firstSensor;
+        msgData += ", ";
+        avgDist = distance0;
         numDist = 1;
       } else {
-        lastDist = distance;
+        if (distance1 > 10 && distance1 < 40 && timerDelta0up == true) {
+          tDelta = timerDelta0;
+          timerDelta0up = false;
+        }
+        lastDist = distance0;
+        numDist += 1;
+        // Collect every 10 samples
+        if (numDist % 10 == 0) {
+          avgDist += lastDist;
+        }
+      }
+    } else if (distance1 > 10 && distance1 < 40 && firstSensor != 0) {
+      // Are we already counting time on second sensor?
+      if (timer0up == false) {
+        firstSensor = 1;
+        timer0up = true;
+        timer0 = 0;
+        timerDelta0up = true;
+        timerDelta0 = 0;
+        tDelta = -1;
+        msgData = String(int(now()));
+        msgData += ", ";
+        msgData += firstSensor;
+        msgData += ", ";
+        avgDist = distance1;
+        numDist = 1;
+      } else {
+        if (distance0 > 10 && distance0 < 40 && timerDelta0up == true) {
+          tDelta = timerDelta0;
+          timerDelta0up = false;
+        }
+        lastDist = distance1;
         numDist += 1;
         // Collect every 10 samples
         if (numDist % 10 == 0) {
@@ -538,15 +589,18 @@ void loop() {
       }
     } else {
       if (timer0up == true) {
-        // Was the length of time valid (more than 100 ms)?
-        if (timer0 > 100) {
+        // Was the length of time valid (more than 100 ms)? Was there a delta?
+        if (timer0 > 100 && tDelta > 0) {
           msgData += timer0;
+          msgData += ", ";
+          msgData += tDelta;
           msgData += ", ";
           avgDist = (avgDist + lastDist) / (numDist / 10 + 1);
           msgData += avgDist;
           queue.push(msgData);
           }
-          timer0up = false; 
+          timer0up = false;
+          firstSensor = -1;
       } else {
         #ifdef _SD_
           // Not collecting data, take the opportunity to write some to SD
