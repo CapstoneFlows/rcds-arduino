@@ -2,6 +2,33 @@
 
 CarCounting is the firmware used for the RCDS.
 
+~ Pinout ~
+
+SD:
+3.3 V, GND, CS -> 10, OI -> 11, SCK -> 13, OO -> 12
+Sensor 1: 
+5 V, GND, Yellow -> 15
+Sensor 2:
+5 V, GND, Yellow -> 18
+BLE:
+5V, GND, TX -> 7, RX -> 8
+
+~ Control Flow ~
+
+T<time>
+ID=<ID>
+DIR=<direction>
+LOC=<location>
+COMMENT=<comment>
+START_RUNNING
+STOP_RUNNING
+RETURN_DATA
+RESET_DEVICE
+
+If there is an error, you will need to restart the device.
+
+~ Instructions ~
+
 Below is the set of instructions and responses for the firmware, in order of how you will see them. C means a command, R means a response from the device. Anything with <command>_ACK is an acknowledgment that it received the command, and will come after any issued command.
 
 Regarding time:

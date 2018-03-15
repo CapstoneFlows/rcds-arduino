@@ -62,6 +62,8 @@ String msgSD;
 // SET PINS APPROPRIATELY
 int sensorPin0 = A1;
 int sensorPin1 = A2;
+int powLedPin = 2;
+int errLedPin = 17;
 #ifdef _SD_
   const int chipSelect = 10;
   const int cardDetect = 6;
@@ -73,6 +75,15 @@ int sensorPin1 = A2;
 // Serial printer
 void serPrint(String str) {
   (BLEOn) ? BTSerial.println(str) : Serial.println(str);
+}
+
+// Error function
+void errState(String err) {
+  while(true) {
+    serPrint(err);
+    digitalWrite(errLedPin, !digitalRead(errLedPin));
+    delay(1000); 
+  }
 }
 
 // Serial sync
@@ -117,8 +128,7 @@ time_t requestSync()
     bool complete = SD.begin();
     delay(100);   // Needs time to start up before checking that it completed
     if (!complete) {
-      serPrint("SD_INIT_ERROR");
-      exit(-1);
+      errState("SD_INIT_ERROR");
     }
     #ifdef _DEBUG_
       Serial.println(">>SD Initialization Done.");
@@ -142,8 +152,7 @@ time_t requestSync()
           #endif
         } else {
           idFile.close();
-          serPrint("SD_VAR_ERROR");
-          exit(-1);
+          errState("SD_VAR_ERROR");
         }
       }
     }
@@ -162,8 +171,7 @@ time_t requestSync()
           Serial.println(">>Error opening SD data file: "+filename);
         #endif
         saveFile.close();
-        serPrint("SD_FILE_ERROR");
-        exit(-1);
+        errState("SD_FILE_ERROR");
     } else {
         #ifdef _DEBUG_
           Serial.println(">>Opened data file successfully.");
@@ -180,9 +188,9 @@ time_t requestSync()
     filename.toCharArray(temp, sizeof(temp));
     saveFile.open(temp, O_WRITE | O_CREAT);
     if (saveFile.isOpen()) {
-        serPrint("SD_SWAP_ERROR");
         saveFile.close();
         active_toggle = false;
+        errState("SD_SWAP_ERROR");
     } else {
         #ifdef _DEBUG_
           Serial.println(">>Swapped data file successfully.");
@@ -195,21 +203,21 @@ time_t requestSync()
     if(BLEOn) {
       if (!SD.wipe(&BTSerial)) {
         SD.errorHalt("Wipe failed.");
-        BTSerial.println("SD_RESET_ERROR");
+        errState("SD_RESET_ERROR");
       }
       if (!SD.begin()) {
         SD.errorHalt("Second init after reset failed.");
-        BTSerial.println("SD_REINIT_ERROR");
+        errState("SD_REINIT_ERROR");
       }
       BTSerial.println("RESET_COMPLETE");
     } else {
       if (!SD.wipe(&Serial)) {
         SD.errorHalt("Wipe failed.");
-        Serial.println("SD_RESET_ERROR");
+        errState("SD_RESET_ERROR");
       }
       if (!SD.begin()) {
         SD.errorHalt("Second init after reset failed.");
-        Serial.println("SD_REINIT_ERROR");
+        errState("SD_REINIT_ERROR");
       }
       Serial.println("RESET_COMPLETE");
     }
@@ -413,6 +421,10 @@ void setup() {
   BTSerial.begin(9600);
   Dist0.begin(sensorPin0);
   Dist1.begin(sensorPin1);
+  pinMode(powLedPin, OUTPUT);
+  pinMode(errLedPin, OUTPUT);
+  digitalWrite(powLedPin, HIGH);
+  digitalWrite(errLedPin, LOW);
 
   // Initialize SD card and check for device variables
   #ifdef _SD_
@@ -621,7 +633,7 @@ void loop() {
               #ifdef _DEBUG_
                 Serial.println(">>No save file to write to!");
               #endif
-              serPrint("SD_WRITE_ERROR");
+              errState("SD_WRITE_ERROR");
             }
           } else {
             // Now it's safe to check to stop running
