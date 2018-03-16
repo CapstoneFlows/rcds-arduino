@@ -61,9 +61,9 @@ String msgSD;
 
 // SET PINS APPROPRIATELY
 int sensorPin0 = A1;
-int sensorPin1 = A2;
+int sensorPin1 = A3;
 int powLedPin = 2;
-int errLedPin = 17;
+int errLedPin = 5;
 #ifdef _SD_
   const int chipSelect = 10;
   const int cardDetect = 6;
@@ -599,6 +599,10 @@ void loop() {
           avgDist += lastDist;
         }
       }
+    } else if (firstSensor == 0 && distance1 > 10 && distance1 < 40 || firstSensor == 1 && distance0 > 10 && distance0 < 40) {
+      #ifdef _DEBUG_
+        Serial.println("Waiting for car to pass");
+      #endif
     } else {
       if (timer0up == true) {
         // Was the length of time valid (more than 100 ms)? Was there a delta?
