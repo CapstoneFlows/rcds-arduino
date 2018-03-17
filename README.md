@@ -84,6 +84,9 @@ R: END_TRANSFER
    Indicates the end of all file transfers.
 
 Regarding device reset:
+C: SET_VARS
+   Will run through sequence for variable setting (ID, DIR, etc)
+R: SET_ACK
 C: RESET_DEVICE
    Will reset variables and wipe the SD card.
 R: RESET_ACK

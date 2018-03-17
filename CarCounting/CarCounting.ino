@@ -399,6 +399,33 @@ void runCommands() {
         }
       #endif
     }
+  } else if (msgSer.indexOf("SET_VARS") > -1) {
+    if (state == "RUNNING") {
+      serPrint("SET_ACK");
+      serPrint("NOT_STOPPED");
+    } else {
+      #ifdef _DEBUG_
+        Serial.print(">>Received command: ");
+        Serial.println(msgSer);
+      #endif
+      serPrint("SET_ACK");
+      DeviceID = DeviceLoc = DeviceDir = DevComment = "";
+      serPrint("NEED_VARS");
+      
+      while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
+        if (Serial.available() || BTSerial.available()) {
+          setParamsCommands();
+        }
+      }
+      
+      #ifdef _SD_
+        SDVarInit(false);
+        SDFileInit();
+      #endif
+
+      state = "READY";
+      serPrint(state);
+    } 
   } else if (msgSer.indexOf("RESET_DEVICE") > -1) {
     if (state == "RUNNING") {
       serPrint("RESET_ACK");
