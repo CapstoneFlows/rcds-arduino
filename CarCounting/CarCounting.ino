@@ -31,12 +31,11 @@ String DeviceDir;
 String DevComment;
 
 // Timer
-elapsedMillis timeSync0;
 elapsedMillis timer0;
 elapsedMillis timerDelta0;
 bool timer0up;
 bool timerDelta0up;
-bool active_toggle;
+String state;
 
 // Regarding the sensor
 int firstSensor;
@@ -77,10 +76,22 @@ void serPrint(String str) {
   (BLEOn) ? BTSerial.println(str) : Serial.println(str);
 }
 
+// Return state
+void returnState() {
+  if(Serial.find("?")) {
+     Serial.println(state);
+     BLEOn = false;
+  } else if(BTSerial.find("?")) {
+     BTSerial.println(state);
+     BLEOn = true;
+  }
+}
+
 // Error function
 void errState(String err) {
+  state = err;
   while(true) {
-    serPrint(err);
+    returnState();
     digitalWrite(errLedPin, !digitalRead(errLedPin));
     delay(1000); 
   }
@@ -96,7 +107,6 @@ void processSyncMessage() {
      if( pctime >= DEFAULT_TIME) { // Check that it's a valid time greater than default
        setTime(pctime); // Sync Arduino clock
      }
-     Serial.println("\n");
      Serial.println("TIME_ACK");
      BLEOn = false;
   } else if(BTSerial.find(TIME_HEADER)) {
@@ -104,10 +114,18 @@ void processSyncMessage() {
      if( pctime >= DEFAULT_TIME) { // Check that it's a valid time greater than default
        setTime(pctime); // Sync Arduino clock
      }
-     BTSerial.println("\n");
      BTSerial.println("TIME_ACK");
      BLEOn = true;
+  } else if(Serial.find("?")) {
+     Serial.write(TIME_REQUEST);
+     Serial.println("");
+     BLEOn = false;
+  } else if(BTSerial.find("?")) {
+     BTSerial.write(TIME_REQUEST);
+     BTSerial.println("");
+     BLEOn = true;
   }
+  
 }
 
 // Send time request symbol (BEL, ASCII 7)
@@ -189,7 +207,6 @@ time_t requestSync()
     saveFile.open(temp, O_WRITE | O_CREAT);
     if (saveFile.isOpen()) {
         saveFile.close();
-        active_toggle = false;
         errState("SD_SWAP_ERROR");
     } else {
         #ifdef _DEBUG_
@@ -307,6 +324,13 @@ void setParamsCommands() {
     msgSer.remove(0, 8);
     DevComment = msgSer.trim();
     serPrint("COMMENT_ACK");
+  } else if (msgSer.indexOf("?") > -1) {
+    #ifdef _DEBUG_
+      Serial.print(">>Received command: ");
+      Serial.println(msgSer);
+    #endif
+    
+    serPrint("NEED_VARS");
   }
   msgSer = "";
 }
@@ -332,7 +356,7 @@ void runCommands() {
         SDFileInit();
       }
     #endif
-    active_toggle = true;
+    state = "RUNNING";
     serPrint("START_ACK");
   } else if (msgSer.indexOf("STOP_RUNNING") > -1) {
     #ifdef _DEBUG_
@@ -347,10 +371,10 @@ void runCommands() {
       #endif
     }
     #endif
-    active_toggle = false;
+    state = "READY";
     serPrint("STOP_ACK");
   } else if (msgSer.indexOf("RETURN_DATA") > -1) {
-    if (active_toggle) {
+    if (state == "RUNNING") {
       serPrint("RETURN_ACK");
       serPrint("NOT_STOPPED");
     } else {
@@ -376,7 +400,7 @@ void runCommands() {
       #endif
     }
   } else if (msgSer.indexOf("RESET_DEVICE") > -1) {
-    if (active_toggle) {
+    if (state == "RUNNING") {
       serPrint("RESET_ACK");
       serPrint("NOT_STOPPED");
     } else {
@@ -406,10 +430,12 @@ void runCommands() {
         SDVarInit(false);
         SDFileInit();
       #endif
-      
-      serPrint("READY");
+
+      state = "READY";
+      serPrint(state);
     }
   }
+  
   msgSer = "";
 }
 
@@ -477,14 +503,9 @@ void setup() {
     }
   #endif
 
-  timeSync0 = 0;
-
   // Set function to call when sync required
   setSyncProvider(requestSync);
   while (timeStatus() == timeNotSet) {
-    if (timeSync0 % 1000 == 0) {
-      requestSync();
-    }
     if (Serial.available() || BTSerial.available()) {
       processSyncMessage();
     }
@@ -524,7 +545,8 @@ void setup() {
     SDFileInit();
   #endif
 
-  serPrint("READY");
+  state = "READY";
+  serPrint(state);
 }
 
 
@@ -532,8 +554,9 @@ void setup() {
 // Main loop
 
 void loop() {
+  returnState();
   // Check if we received command to start running
-  if (active_toggle) {
+  if (state == "RUNNING") {
     distance0 = Dist0.getDistanceCentimeter();
     distance1 = Dist1.getDistanceCentimeter();
     distance0 += 10;

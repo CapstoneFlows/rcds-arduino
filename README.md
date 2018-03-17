@@ -15,6 +15,7 @@ BLE:
 
 ~ Control Flow ~
 
+?
 T<time>
 ID=<ID>
 DIR=<direction>
@@ -31,8 +32,17 @@ If there is an error, you will need to restart the device.
 
 Below is the set of instructions and responses for the firmware, in order of how you will see them. C means a command, R means a response from the device. Anything with <command>_ACK is an acknowledgment that it received the command, and will come after any issued command.
 
+C: ?
+    Will respond with the current state. Possible options are:
+    R: ASCII Character 8 (BEL)
+    R: NEED_VARS
+    R: READY
+    R: RUNNING
+    Any error code (see below)
+
+
 Regarding time:
-R: ASCII Character 7 (BEL) repeated
+R: ASCII Character 7 (BEL)
    Device is looking for time sync
 C: T<Unix time>
    Sets the device time
@@ -55,6 +65,7 @@ R: READY
    Device is ready to start, stop, return, and reset. Will only come if NEED_VARS did not, or if all the variables (ID, LOC, DIR, COMMENT) were set after NEED_VARS.
 C: START_RUNNING
 R: START_ACK
+R: RUNNING
 C: STOP_RUNNING
 R: STOP_ACK
 
