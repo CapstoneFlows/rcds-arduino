@@ -33,12 +33,12 @@ If there is an error, you will need to restart the device.
 Below is the set of instructions and responses for the firmware, in order of how you will see them. C means a command, R means a response from the device. Anything with <command>_ACK is an acknowledgment that it received the command, and will come after any issued command.
 
 C: ?
-    Will respond with the current state. Possible options are:
+    Will respond with the current state and device info. Possible options are:
     R: ASCII Character 8 (BEL)
-    R: NEED_VARS
-    R: READY
-    R: RUNNING
-    Any error code (see below)
+    R: NEED_VARS ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
+    R: READY ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
+    R: RUNNING ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
+    Any error code (see below) ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
 
 
 Regarding time:

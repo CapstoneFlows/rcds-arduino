@@ -76,13 +76,26 @@ void serPrint(String str) {
   (BLEOn) ? BTSerial.println(str) : Serial.println(str);
 }
 
+String retState() {
+  String retState = state;
+  retState += " ID=";
+  retState += DeviceID;
+  retState += " LOC=";
+  retState += DeviceLoc;
+  retState += " DIR=";
+  retState += DeviceDir;
+  retState += " COMMENT=";
+  retState += DevComment;
+  return retState;
+}
+
 // Return state
 void returnState() {
   if(Serial.find("?")) {
-     Serial.println(state);
+     Serial.println(retState());
      BLEOn = false;
   } else if(BTSerial.find("?")) {
-     BTSerial.println(state);
+     BTSerial.println(retState());
      BLEOn = true;
   }
 }
@@ -329,8 +342,8 @@ void setParamsCommands() {
       Serial.print(">>Received command: ");
       Serial.println(msgSer);
     #endif
-    
-    serPrint("NEED_VARS");
+
+    serPrint(retState());
   }
   msgSer = "";
 }
@@ -410,7 +423,8 @@ void runCommands() {
       #endif
       serPrint("SET_ACK");
       DeviceID = DeviceLoc = DeviceDir = DevComment = "";
-      serPrint("NEED_VARS");
+      state = "NEED_VARS";
+      serPrint(state);
       
       while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
         if (Serial.available() || BTSerial.available()) {
@@ -441,7 +455,8 @@ void runCommands() {
       #endif
       
       DeviceID = DeviceLoc = DeviceDir = DevComment = "";
-      serPrint("NEED_VARS");
+      state = "NEED_VARS";
+      serPrint(state);
       
       while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
         if (Serial.available() || BTSerial.available()) {
@@ -552,7 +567,8 @@ void setup() {
     DeviceLoc = "";
     DeviceDir = "";
     DevComment = "";
-    serPrint("NEED_VARS");
+    state = "NEED_VARS";
+    serPrint(state);
   }
 
   // Set device variables
