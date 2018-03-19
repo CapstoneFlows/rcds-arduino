@@ -34,7 +34,7 @@ Below is the set of instructions and responses for the firmware, in order of how
 
 C: ?
     Will respond with the current state and device info. Possible options are:
-    R: ASCII Character 8 (BEL)
+    R: NEED_TIME
     R: NEED_VARS ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
     R: READY ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
     R: RUNNING ID=<ID> LOC=<LOC> DIR=<DIR> COMMENT=<COMMENT>
@@ -42,7 +42,7 @@ C: ?
 
 
 Regarding time:
-R: ASCII Character 7 (BEL)
+R: NEED_TIME
    Device is looking for time sync
 C: T<Unix time>
    Sets the device time

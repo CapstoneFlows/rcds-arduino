@@ -10,7 +10,7 @@
 
 // General use definitions and declarations
 #define TIME_HEADER  "T"   // Header tag for serial time sync message
-#define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
+#define TIME_REQUEST  "NEED_TIME"    // ASCII bell character requests a time sync message 
 
 
 /*-------------------------------------------------------------------------*/
@@ -130,12 +130,10 @@ void processSyncMessage() {
      BTSerial.println("TIME_ACK");
      BLEOn = true;
   } else if(Serial.find("?")) {
-     Serial.write(TIME_REQUEST);
-     Serial.println("");
+     Serial.println(TIME_REQUEST);
      BLEOn = false;
   } else if(BTSerial.find("?")) {
-     BTSerial.write(TIME_REQUEST);
-     BTSerial.println("");
+     BTSerial.println(TIME_REQUEST);
      BLEOn = true;
   }
   
@@ -144,8 +142,8 @@ void processSyncMessage() {
 // Send time request symbol (BEL, ASCII 7)
 time_t requestSync()
 {
-  Serial.write(TIME_REQUEST);
-  BTSerial.write(TIME_REQUEST);
+  Serial.println(TIME_REQUEST);
+  BTSerial.println(TIME_REQUEST);
   return 0;
 }
 
@@ -659,7 +657,7 @@ void loop() {
           avgDist += lastDist;
         }
       }
-    } else if (firstSensor == 0 && distance1 > 10 && distance1 < 40 || firstSensor == 1 && distance0 > 10 && distance0 < 40) {
+    } else if ((firstSensor == 0 && distance1 > 10 && distance1 < 40) || (firstSensor == 1 && distance0 > 10 && distance0 < 40)) {
       #ifdef _DEBUG_
         Serial.println("Waiting for car to pass");
       #endif
