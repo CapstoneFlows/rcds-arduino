@@ -47,6 +47,8 @@ R: NEED_TIME
 C: T<Unix time>
    Sets the device time
 R: TIME_ACK
+R: TIME_SYNCED
+   If the time is already synchronized, this will be the response.
 
 Regarding system variables:
 R: NEED_VARS
