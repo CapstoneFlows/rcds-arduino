@@ -424,7 +424,6 @@ void runCommands() {
       serPrint("SET_ACK");
       DeviceID = DeviceLoc = DeviceDir = DevComment = "";
       state = "NEED_VARS";
-      serPrint(state);
       
       while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
         if (Serial.available() || BTSerial.available()) {
@@ -438,7 +437,6 @@ void runCommands() {
       #endif
 
       state = "READY";
-      serPrint(state);
     } 
   } else if (msgSer.indexOf("RESET_DEVICE") > -1) {
     if (state == "RUNNING") {
@@ -456,7 +454,6 @@ void runCommands() {
       
       DeviceID = DeviceLoc = DeviceDir = DevComment = "";
       state = "NEED_VARS";
-      serPrint(state);
       
       while (DeviceID == "" || DeviceLoc == "" || DeviceDir == "" || DevComment == "") {
         if (Serial.available() || BTSerial.available()) {
@@ -474,7 +471,6 @@ void runCommands() {
       #endif
 
       state = "READY";
-      serPrint(state);
     }
   }
   
@@ -568,7 +564,6 @@ void setup() {
     DeviceDir = "";
     DevComment = "";
     state = "NEED_VARS";
-    serPrint(state);
   }
 
   // Set device variables
@@ -589,7 +584,6 @@ void setup() {
   #endif
 
   state = "READY";
-  serPrint(state);
 }
 
 
