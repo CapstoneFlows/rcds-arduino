@@ -486,7 +486,7 @@ void setup() {
   pinMode(powLedPin, OUTPUT);
   pinMode(errLedPin, OUTPUT);
   digitalWrite(powLedPin, HIGH);
-  digitalWrite(errLedPin, LOW);
+  digitalWrite(errLedPin, HIGH);
 
   // Initialize SD card and check for device variables
   #ifdef _SD_
@@ -539,23 +539,6 @@ void setup() {
     }
   #endif
 
-  // Set function to call when sync required
-  setSyncProvider(requestSync);
-  while (timeStatus() == timeNotSet) {
-    if (Serial.available() || BTSerial.available()) {
-      processSyncMessage();
-    }
-  }
-  timer0up = false;
-  timerDelta0up = false;
-  timer0 = 0;
-  timerDelta0 = 0;
-  firstSensor = -1;
-  
-  #ifdef _DEBUG_
-    Serial.println("\n>>Time synchronized.");
-  #endif
-
   if (!SDDevVarsSaved) {
     DeviceID = "";
     DeviceLoc = "";
@@ -580,7 +563,26 @@ void setup() {
     SDVarInit(SDDevVarsSaved);
     SDFileInit();
   #endif
-
+  
+  digitalWrite(errLedPin, LOW);
+  
+  // Set function to call when sync required
+  setSyncProvider(requestSync);
+  while (timeStatus() == timeNotSet) {
+    if (Serial.available() || BTSerial.available()) {
+      processSyncMessage();
+    }
+  }
+  timer0up = false;
+  timerDelta0up = false;
+  timer0 = 0;
+  timerDelta0 = 0;
+  firstSensor = -1;
+  
+  #ifdef _DEBUG_
+    Serial.println("\n>>Time synchronized.");
+  #endif
+  
   state = "READY";
 }
 
