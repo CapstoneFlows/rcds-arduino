@@ -342,7 +342,15 @@ void setParamsCommands() {
     #endif
 
     serPrint(retState());
+  } else if (msgSer.indexOf("T") == 0) {
+    #ifdef _DEBUG_
+      Serial.print(">>Received command: ");
+      Serial.println(msgSer);
+    #endif
+
+    serPrint("TIME_SYNCED");
   }
+  
   msgSer = "";
 }
 
@@ -470,6 +478,20 @@ void runCommands() {
 
       state = "READY";
     }
+  } else if (msgSer.indexOf("?") > -1) {
+    #ifdef _DEBUG_
+      Serial.print(">>Received command: ");
+      Serial.println(msgSer);
+    #endif
+
+    serPrint(retState());
+  } else if (msgSer.indexOf("T") == 0) {
+    #ifdef _DEBUG_
+      Serial.print(">>Received command: ");
+      Serial.println(msgSer);
+    #endif
+
+    serPrint("TIME_SYNCED");
   }
   
   msgSer = "";
@@ -591,9 +613,8 @@ void setup() {
 // Main loop
 
 void loop() {
-  returnState();
   // Check if we received command to start running
-  if (state == "RUNNING") {
+  if (state == "RUNNING") {    
     distance0 = Dist0.getDistanceCentimeter();
     distance1 = Dist1.getDistanceCentimeter();
     distance0 += 10;
