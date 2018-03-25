@@ -35,6 +35,7 @@ elapsedMillis timer0;
 elapsedMillis timerDelta0;
 bool timer0up;
 bool timerDelta0up;
+String nowT;
 String state;
 
 // Regarding the sensor
@@ -635,7 +636,10 @@ void loop() {
         timerDelta0up = true;
         timerDelta0 = 0;
         tDelta = -1;
-        msgData = String(int(now()));
+        nowT = String(int(now()));
+        msgData = DeviceID;
+        msgData += ", ";
+        msgData += nowT;
         msgData += ", ";
         msgData += firstSensor;
         msgData += ", ";
