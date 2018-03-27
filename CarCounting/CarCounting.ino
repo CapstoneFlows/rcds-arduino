@@ -505,12 +505,28 @@ void setup() {
   Serial.begin(9600);
   BTSerial.begin(9600);
   Dist0.begin(sensorPin0);
+  Dist0.setAveraging(10);
   Dist1.begin(sensorPin1);
+  Dist0.setAveraging(10);
   pinMode(powLedPin, OUTPUT);
   pinMode(errLedPin, OUTPUT);
   digitalWrite(powLedPin, HIGH);
-  digitalWrite(errLedPin, HIGH);
+  
+  // Set function to call when sync required
+  setSyncProvider(requestSync);
+  while (timeStatus() == timeNotSet) {
+    if (Serial.available() || BTSerial.available()) {
+      processSyncMessage();
+    }
+  }
+  timer0up = false;
+  timerDelta0up = false;
+  timer0 = 0;
+  timerDelta0 = 0;
+  firstSensor = -1;
 
+  digitalWrite(errLedPin, HIGH);
+  
   // Initialize SD card and check for device variables
   #ifdef _SD_
     // Start up SD card
@@ -562,6 +578,8 @@ void setup() {
     }
   #endif
 
+  digitalWrite(errLedPin, LOW);
+
   if (!SDDevVarsSaved) {
     DeviceID = "";
     DeviceLoc = "";
@@ -577,6 +595,8 @@ void setup() {
     }
   }
 
+  digitalWrite(errLedPin, HIGH);
+  
   #ifdef _DEBUG_
     Serial.println(">>Parameters set.");
   #endif
@@ -587,24 +607,11 @@ void setup() {
     SDFileInit();
   #endif
   
-  digitalWrite(errLedPin, LOW);
-  
-  // Set function to call when sync required
-  setSyncProvider(requestSync);
-  while (timeStatus() == timeNotSet) {
-    if (Serial.available() || BTSerial.available()) {
-      processSyncMessage();
-    }
-  }
-  timer0up = false;
-  timerDelta0up = false;
-  timer0 = 0;
-  timerDelta0 = 0;
-  firstSensor = -1;
-  
   #ifdef _DEBUG_
     Serial.println("\n>>Time synchronized.");
   #endif
+  
+  digitalWrite(errLedPin, LOW);
   
   state = "READY";
 }
@@ -627,7 +634,7 @@ void loop() {
     #endif
   
     // Valid distances are 10 cm to 40 cm
-    if (distance0 > 10 && distance0 < 40 && firstSensor != 1) {
+    if (distance0 > 10 && distance0 < 35 && firstSensor != 1) {
       // Are we already counting time on first sensor?
       if (timer0up == false) {
         firstSensor = 0;
@@ -646,7 +653,7 @@ void loop() {
         avgDist = distance0;
         numDist = 1;
       } else {
-        if (distance1 > 10 && distance1 < 40 && timerDelta0up == true) {
+        if (distance1 > 10 && distance1 < 35 && timerDelta0up == true) {
           tDelta = timerDelta0;
           timerDelta0up = false;
         }
@@ -666,7 +673,10 @@ void loop() {
         timerDelta0up = true;
         timerDelta0 = 0;
         tDelta = -1;
-        msgData = String(int(now()));
+        nowT = String(int(now()));
+        msgData = DeviceID;
+        msgData += ", ";
+        msgData += nowT;
         msgData += ", ";
         msgData += firstSensor;
         msgData += ", ";
