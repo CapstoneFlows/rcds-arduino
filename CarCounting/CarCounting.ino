@@ -87,7 +87,6 @@ String retState() {
   retState += DeviceDir;
   retState += " COMMENT=";
   retState += DevComment;
-  retState += "\r";
   return retState;
 }
 
