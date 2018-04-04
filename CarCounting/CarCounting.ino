@@ -157,7 +157,7 @@ time_t requestSync()
   // Function to start up SD card
   void SDInit() {
     bool complete = SD.begin();
-    delay(100);   // Needs time to start up before checking that it completed
+    delay(500);   // Needs time to start up before checking that it completed
     if (!complete) {
       errState("SD_INIT_ERROR");
     }
