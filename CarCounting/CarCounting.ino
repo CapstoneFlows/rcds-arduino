@@ -87,6 +87,7 @@ String retState() {
   retState += DeviceDir;
   retState += " COMMENT=";
   retState += DevComment;
+  retState += "@#";
   return retState;
 }
 
