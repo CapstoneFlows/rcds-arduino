@@ -108,7 +108,7 @@ void errState(String err) {
   while(true) {
     returnState();
     digitalWrite(errLedPin, !digitalRead(errLedPin));
-    delay(1000); 
+    delay(500); 
   }
 }
 
@@ -505,10 +505,11 @@ void runCommands() {
 void setup() {
   Serial.begin(9600);
   BTSerial.begin(9600);
+  analogReference(EXTERNAL);
   Dist0.begin(sensorPin0);
   Dist0.setAveraging(10);
   Dist1.begin(sensorPin1);
-  Dist0.setAveraging(10);
+  Dist1.setAveraging(10);
   pinMode(powLedPin, OUTPUT);
   pinMode(errLedPin, OUTPUT);
   digitalWrite(powLedPin, HIGH);
@@ -626,16 +627,16 @@ void loop() {
   if (state == "RUNNING") {    
     distance0 = Dist0.getDistanceCentimeter();
     distance1 = Dist1.getDistanceCentimeter();
-    distance0 += 10;
-    distance1 += 10;
     #ifdef _DEBUG_
       Serial.print("Distance read: ");
+      Serial.println(String(Dist0.getDistanceRaw()));
+      Serial.println(String(Dist1.getDistanceRaw()));
       Serial.println(String(distance0));
       Serial.println(String(distance1));
     #endif
   
     // Valid distances are 10 cm to 40 cm
-    if (distance0 > 10 && distance0 < 35 && firstSensor != 1) {
+    if (distance0 > 5 && distance0 < 10 && firstSensor != 1) {
       // Are we already counting time on first sensor?
       if (timer0up == false) {
         firstSensor = 0;
@@ -654,7 +655,7 @@ void loop() {
         avgDist = distance0;
         numDist = 1;
       } else {
-        if (distance1 > 10 && distance1 < 35 && timerDelta0up == true) {
+        if (distance1 > 5 && distance1 < 10 && timerDelta0up == true) {
           tDelta = timerDelta0;
           timerDelta0up = false;
         }
@@ -665,7 +666,7 @@ void loop() {
           avgDist += lastDist;
         }
       }
-    } else if (distance1 > 10 && distance1 < 40 && firstSensor != 0) {
+    } else if (distance1 > 5 && distance1 < 10 && firstSensor != 0) {
       // Are we already counting time on second sensor?
       if (timer0up == false) {
         firstSensor = 1;
@@ -684,7 +685,7 @@ void loop() {
         avgDist = distance1;
         numDist = 1;
       } else {
-        if (distance0 > 10 && distance0 < 40 && timerDelta0up == true) {
+        if (distance0 > 5 && distance0 < 10 && timerDelta0up == true) {
           tDelta = timerDelta0;
           timerDelta0up = false;
         }
@@ -695,7 +696,7 @@ void loop() {
           avgDist += lastDist;
         }
       }
-    } else if ((firstSensor == 0 && distance1 > 10 && distance1 < 40) || (firstSensor == 1 && distance0 > 10 && distance0 < 40)) {
+    } else if ((firstSensor == 0 && distance1 > 5 && distance1 < 10) || (firstSensor == 1 && distance0 > 5 && distance0 < 10)) {
       #ifdef _DEBUG_
         Serial.println("Waiting for car to pass");
       #endif
@@ -708,7 +709,7 @@ void loop() {
           msgData += tDelta;
           msgData += ", ";
           avgDist = (avgDist + lastDist) / (numDist / 10 + 1);
-          msgData += avgDist;
+          msgData += (avgDist*3);
           queue.push(msgData);
           }
           timer0up = false;
