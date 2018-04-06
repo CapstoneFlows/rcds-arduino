@@ -377,6 +377,7 @@ void runCommands() {
         SDFileInit();
       }
     #endif
+    digitalWrite(errLedPin, HIGH);
     state = "RUNNING";
     serPrint("START_ACK");
   } else if (msgSer.indexOf("STOP_RUNNING") > -1) {
@@ -392,6 +393,7 @@ void runCommands() {
       #endif
     }
     #endif
+    digitalWrite(errLedPin, LOW);
     state = "READY";
     serPrint("STOP_ACK");
   } else if (msgSer.indexOf("RETURN_DATA") > -1) {
