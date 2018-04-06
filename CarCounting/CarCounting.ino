@@ -32,7 +32,7 @@ String DevComment;
 
 // Timer
 elapsedMillis timer0;
-elapsedMillis timerDelta0;
+unsigned long timerDelta0;
 bool timer0up;
 bool timerDelta0up;
 String nowT;
@@ -507,9 +507,9 @@ void setup() {
   BTSerial.begin(9600);
   analogReference(EXTERNAL);
   Dist0.begin(sensorPin0);
-  Dist0.setAveraging(10);
+  Dist0.setAveraging(5);
   Dist1.begin(sensorPin1);
-  Dist1.setAveraging(10);
+  Dist1.setAveraging(5);
   pinMode(powLedPin, OUTPUT);
   pinMode(errLedPin, OUTPUT);
   digitalWrite(powLedPin, HIGH);
@@ -643,7 +643,7 @@ void loop() {
         timer0up = true;
         timer0 = 0;
         timerDelta0up = true;
-        timerDelta0 = 0;
+        timerDelta0 = micros();
         tDelta = -1;
         nowT = String(int(now()));
         msgData = DeviceID;
@@ -656,7 +656,7 @@ void loop() {
         numDist = 1;
       } else {
         if (distance1 > 5 && distance1 < 10 && timerDelta0up == true) {
-          tDelta = timerDelta0;
+          tDelta = int(micros() - timerDelta0);
           timerDelta0up = false;
         }
         lastDist = distance0;
@@ -673,7 +673,7 @@ void loop() {
         timer0up = true;
         timer0 = 0;
         timerDelta0up = true;
-        timerDelta0 = 0;
+        timerDelta0 = micros();
         tDelta = -1;
         nowT = String(int(now()));
         msgData = DeviceID;
@@ -686,7 +686,7 @@ void loop() {
         numDist = 1;
       } else {
         if (distance0 > 5 && distance0 < 10 && timerDelta0up == true) {
-          tDelta = timerDelta0;
+          tDelta = int(micros() - timerDelta0);
           timerDelta0up = false;
         }
         lastDist = distance1;
@@ -703,7 +703,7 @@ void loop() {
     } else {
       if (timer0up == true) {
         // Was the length of time valid (more than 100 ms)? Was there a delta?
-        if (timer0 > 100 && tDelta > 0) {
+        if (timer0 > 100 && tDelta > 1000) {
           msgData += timer0;
           msgData += ", ";
           msgData += tDelta;
